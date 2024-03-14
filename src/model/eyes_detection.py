@@ -1,12 +1,25 @@
 import cv2
 import dlib
 import numpy as np
+import os
+
+directory_name = "src/model/eye_detection_output"
+
+if os.path.exists(directory_name):
+    print("Deleted directory")
+    os.shutil.rmtree(directory_name)
+    print("Creating empty directory")
+    os.mkdir(directory_name)
+else:
+    print("Created directory")
+    os.mkdir(directory_name)
+
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("src/model/shape_predictor_68_face_landmarks.dat")
 
 def detect_eyes(frame_gray, frame, frame_number):
-    print(f"Frame Number", frame_number)
+    # print(f"Frame Number", frame_number)
     faces = detector(frame_gray)
 
     status = "Unknown"
@@ -23,40 +36,43 @@ def detect_eyes(frame_gray, frame, frame_number):
         left_eye_points = np.array(left_eye_points, np.int32)
         right_eye_points = np.array(right_eye_points, np.int32)
 
-        cv2.polylines(frame, [left_eye_points], True, (0, 0, 255), 1)
-        cv2.polylines(frame, [right_eye_points], True, (0, 0, 255), 1)
+        # cv2.polylines(frame, [left_eye_points], True, (0, 0, 255), 1)
+        # cv2.polylines(frame, [right_eye_points], True, (0, 0, 255), 1)
 
         left_ear = eye_aspect_ratio(left_eye_points)
         right_ear = eye_aspect_ratio(right_eye_points)
 
         ear = (left_ear + right_ear) / 2
 
-        closed_ear_thresh = 0.6
+        # Decrease this to increase accuracy (from what I tested 0.5 - 0.7 works best)
+        closed_ear_thresh = 0.59
 
-        # Classify the eyes as open or closed based on the EAR threshold
         if ear < closed_ear_thresh:
             status = "Closed"
-            cv2.putText(frame, 'Closed', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            # cv2.putText(frame, 'Closed', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         else:
             status = "Open"
-            cv2.putText(frame, 'Open', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            # cv2.putText(frame, 'Open', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         
     return frame, status
 
 def eye_aspect_ratio(eye_points):
+    # calculating vertical distance helps to understand whether eye is open or not
     vertical_dist1 = abs(((eye_points[1][0] - eye_points[5][0]) * 2 + (eye_points[1][1] - eye_points[5][1]) * 2)) ** 0.5
     vertical_dist2 = abs(((eye_points[2][0] - eye_points[4][0]) * 2 + (eye_points[2][1] - eye_points[4][1]) * 2)) ** 0.5
 
+    # horizontal distance provides better results for different eye shapes
     horizontal_dist = abs(((eye_points[0][0] - eye_points[3][0]) * 2 + (eye_points[0][1] - eye_points[3][1]) * 2)) ** 0.5
 
     ear = (vertical_dist1 + vertical_dist2) / (2 * horizontal_dist)
 
     return ear
 
-cap = cv2.VideoCapture("src/model/I ruined everything..mp4")
+# change the video path
+cap = cv2.VideoCapture("src/model/Gain 500 Chess Elo with ATTACKING Chess.mp4")
 frame_count = 0
-skip_ratio = 10
+skip_ratio = 500
 frame_number = 0
 
 while True:
@@ -68,18 +84,19 @@ while True:
     frame_count += 1
     frame_number += 1
 
+    # taking 1 frame from 30 frames for now(adjust based on video length)
     if frame_count % skip_ratio != 0:
         continue 
 
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     frame, status = detect_eyes(frame_gray, frame, frame_number)
 
+    # saving only those image that have open eyes
     if status == "Open":
-        cv2.imwrite(str(frame_number) + ".jpg", frame)
-
+        cv2.imwrite(f"{directory_name}/{str(frame_number)}.jpg", frame)
 
     if (cv2.waitKey(30) == 27):
         break
-
+    
 cap.release()
 cv2.destroyAllWindows()
