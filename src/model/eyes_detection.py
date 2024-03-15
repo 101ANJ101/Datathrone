@@ -3,23 +3,20 @@ import dlib
 import numpy as np
 import os
 
-directory_name = "src/model/eye_detection_output"
+directory_name = "D:/Studies/Code/Python/Datathrone/eye_detection_output"
 
 if os.path.exists(directory_name):
-    print("Deleted directory")
-    os.shutil.rmtree(directory_name)
-    print("Creating empty directory")
-    os.mkdir(directory_name)
-else:
-    print("Created directory")
-    os.mkdir(directory_name)
+    for file in os.listdir(directory_name):
+        file_to_remove = os.path.join(directory_name, file)
+        os.remove(file_to_remove)
+    os.rmdir(directory_name)
 
+os.mkdir(directory_name)
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("src/model/shape_predictor_68_face_landmarks.dat")
 
 def detect_eyes(frame_gray, frame, frame_number):
-    # print(f"Frame Number", frame_number)
     faces = detector(frame_gray)
 
     status = "Unknown"
@@ -45,7 +42,8 @@ def detect_eyes(frame_gray, frame, frame_number):
         ear = (left_ear + right_ear) / 2
 
         # Decrease this to increase accuracy (from what I tested 0.5 - 0.7 works best)
-        closed_ear_thresh = 0.59
+        # closed_ear_thresh = 0.59
+        closed_ear_thresh = 0.55
 
         if ear < closed_ear_thresh:
             status = "Closed"
@@ -54,7 +52,7 @@ def detect_eyes(frame_gray, frame, frame_number):
             status = "Open"
             # cv2.putText(frame, 'Open', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        
+    print(f"{frame_number} + {status}")
     return frame, status
 
 def eye_aspect_ratio(eye_points):
@@ -70,33 +68,36 @@ def eye_aspect_ratio(eye_points):
     return ear
 
 # change the video path
-cap = cv2.VideoCapture("src/model/Gain 500 Chess Elo with ATTACKING Chess.mp4")
-frame_count = 0
-skip_ratio = 500
-frame_number = 0
+def eye_detection(video_path, frames_to_process):
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    skip_ratio = 30 // frames_to_process
+    frame_number = 0
 
-while True:
-    ret, frame = cap.read()
+    while True:
+        ret, frame = cap.read()
 
-    if not ret:
-        break
-    
-    frame_count += 1
-    frame_number += 1
+        if not ret:
+            break
+        
+        frame_count += 1
+        frame_number += 1
 
-    # taking 1 frame from 30 frames for now(adjust based on video length)
-    if frame_count % skip_ratio != 0:
-        continue 
+        # taking 1 frame from 30 frames for now(adjust based on video length)
+        if frame_count % skip_ratio != 0:
+            continue 
 
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    frame, status = detect_eyes(frame_gray, frame, frame_number)
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame, status = detect_eyes(frame_gray, frame, frame_number)
 
-    # saving only those image that have open eyes
-    if status == "Open":
-        cv2.imwrite(f"{directory_name}/{str(frame_number)}.jpg", frame)
+        # saving only those image that have open eyes
 
-    if (cv2.waitKey(30) == 27):
-        break
-    
-cap.release()
-cv2.destroyAllWindows()
+        if status == "Open":
+            cv2.imwrite(f"{directory_name}/{str(frame_number)}.jpg", frame)
+
+        if (cv2.waitKey(30) == 27):
+            break
+
+    return True
+    cap.release()
+    cv2.destroyAllWindows()

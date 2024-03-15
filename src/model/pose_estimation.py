@@ -1,55 +1,89 @@
-import dlib
 import cv2
+import dlib
 import numpy as np
-import os 
-def calculate_eye_angle(left_eye_center, focal_point):
-  vector1 = left_eye_center - focal_point
-  vector2 = np.array([0, -1]) 
+import os
 
-  if np.linalg.norm(vector1) == 0:
-    return 0  
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor('src/model/shape_predictor_68_face_landmarks.dat')
 
-  angle = np.arccos(np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2)))
-  return np.degrees(angle)
+frame_number = 1
+
+directory = "public/eye_detection_output"
+directory_name = "D:/Studies/Code/Python/Datathrone/public/is_facing_camera_output"
+
+if os.path.exists(directory_name):
+    for file in os.listdir(directory_name):
+        file_to_remove = os.path.join(directory_name, file)
+        os.remove(file_to_remove)
+    os.rmdir(directory_name)
+
+os.mkdir(directory_name)
+
+def detect_gaze(image_path, frame_number):
+    if os.getcwd() == directory_name:
+        print("1st condition before")
+        os.chdir("../eye_detection_output")
+        print("1st condition after")
+    elif os.getcwd() == directory:
+        print("2nd condition")
+    elif os.getcwd() == "D:\Studies\Code\Python\Datathrone":
+        print("3rd condition before")
+        os.chdir("/public/eye_detection_output")
+        print(os.getcwd())
+        print("3rd condition after")
+
+    print(f"First {os.getcwd()}")
+    print(image_path)
+    image = cv2.imread(image_path)
+
+    if image is None:
+        # print("Invalid image")
+        return 
+    
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    faces = detector(gray)
+
+    for face in faces:
+        look = "idk"
+        shape = predictor(gray, face)
+
+        # Calculate the center of the eyes
+        left_eye = np.array([shape.part(36).x, shape.part(36).y])
+        right_eye = np.array([shape.part(45).x, shape.part(45).y])
+        eye_center = (left_eye + right_eye) // 2
+
+        image_width, image_height = image.shape[1], image.shape[0]
+        
+        reference_point = np.array([image_width // 2, image_height // 2])
+        gaze_vector = eye_center - reference_point
+
+        gaze_vector = gaze_vector.astype(float)
+        gaze_vector /= np.linalg.norm(gaze_vector)
+
+        gaze_angle_rad = np.arctan2(gaze_vector[1], gaze_vector[0])
+
+        gaze_angle_deg = np.degrees(gaze_angle_rad)
+
+        if (60 <= gaze_angle_deg < 140) or (-150 < gaze_angle_deg <= -90):
+            look = "Yes"
+            print("Person is looking at the camera")
+        else:
+            look = "No"
+            print("Person is not looking at the camera")
+
+    # if look == "Yes":
+    if os.getcwd() != directory:
+        os.chdir(directory_name)
+
+    print(f"Second {os.getcwd()}")
+    cv2.imwrite('Frame' + str(frame_number) + ".jpg" , image)
+    frame_number += 1
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
-def process_image(image_path, detector, predictor):
-  img = cv2.imread(image_path)
-  gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+for image in os.listdir(directory):
+    # path = f"{directory}/{image}"
+    detect_gaze(image, frame_number)
 
-  gray = cv2.equalizeHist(gray)
-
-  faces = detector(gray)
-
-  for face in faces:
-    landmarks = predictor(gray, face)
-    landmarks = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)])
-
-    left_eye_center = np.mean(landmarks[36:42], axis=0)
-    right_eye_center = np.mean(landmarks[42:48], axis=0)
-
-    eyes_center = (left_eye_center + right_eye_center) / 2
-
-    focal_point = np.array([img.shape[1] / 2, img.shape[0] / 2])
-
-    angle = calculate_eye_angle(left_eye_center, focal_point)
-
-    cv2.putText(img, f"Angle: {angle:.2f} degrees", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-  cv2.imshow("Image", img)
-  cv2.waitKey(0) 
-
-
-if __name__ == "__main__":
-  image_folder = "src/model/eye_detection_output"
-
-  detector = dlib.get_frontal_face_detector()
-  predictor = dlib.shape_predictor('src/model/shape_predictor_68_face_landmarks.dat')
-
-  for filename in os.listdir(image_folder):
-    if filename.endswith(".jpg") or filename.endswith(".png"):
-      image_path = os.path.join(image_folder, filename)
-      process_image(image_path, detector, predictor)
-
-  # Release resources
-  cv2.destroyAllWindows()
